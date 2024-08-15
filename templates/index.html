@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Link Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://cdn.pixabay.com/photo/2018/01/29/13/03/internet-3116062_960_720.jpg" alt="Internet-Symbol mit globalem Netzwerk">
+            <h1>Friedl's Linklist</h1>
+        </div>
+
+        <h2 class="section-title">Link Hinzufügen</h2>
+        <button id="toggleFormButton" class="form-button" onclick="toggleForm()">Link einfügen</button>
+
+        <div class="form-container" id="formContainer" style="display:none;">
+            <input type="text" id="comment" placeholder="Kommentar eingeben" required>
+            <input type="url" id="link" placeholder="Link eingeben" required>
+            <div class="category-container">
+                <select id="category1">
+                    <option value="" disabled selected>Kategorie 1 auswählen</option>
+                    <option value="Sprache">Sprache</option>
+                    <option value="Tutorial">Tutorial</option>
+                    <option value="Blog">Blog</option>
+                </select>
+                <select id="category2">
+                    <option value="" disabled selected>Kategorie 2 auswählen</option>
+                    <option value="Technologie">Technologie</option>
+                    <option value="Reise">Reise</option>
+                    <option value="Essen&Trinken">Essen&Trinken</option>
+                </select>
+            </div>
+            <input type="date" id="date" required>
+            <button class="form-button" onclick="addLink()">Link hinzufügen</button>
+        </div>
+
+        <h2 class="section-title">Links filtern</h2>
+        <div class="filter-container">
+            <input type="text" id="searchComment" placeholder="Beschreibung suchen">
+            <select id="filterCategory1">
+                <option value="" disabled selected>Kategorie 1 auswählen</option>
+                <option value="Sprache">Sprache</option>
+                <option value="Tutorial">Tutorial</option>
+                <option value="Blog">Blog</option>
+            </select>
+            <select id="filterCategory2">
+                <option value="" disabled selected>Kategorie 2 auswählen</option>
+                <option value="Technologie">Technologie</option>
+                <option value="Reise">Reise</option>
+                <option value="Essen&Trinken">Essen&Trinken</option>
+            </select>
+            <button class="form-button" onclick="filterLinks()">Filtern</button>
+            <button class="form-button" onclick="clearFilter()">Filter löschen</button>
+        </div>
+
+        <h2 class="section-title">Gespeicherte Links</h2>
+        <div class="tile-container" id="tileContainer">
+            <!-- Hier werden die Kacheln eingefügt -->
+        </div>
+    </div>
+
+    <script>
+        // Funktion zum Umschalten des Formulars
+        function toggleForm() {
+            const formContainer = document.getElementById('formContainer');
+            if (formContainer.style.display === 'none') {
+                formContainer.style.display = 'block';
+            } else {
+                formContainer.style.display = 'none';
+            }
+        }
+
+        // Funktion zum Hinzufügen eines Links
+        async function addLink() {
+            const comment = document.getElementById('comment').value;
+            const link = document.getElementById('link').value;
+            const category1 = document.getElementById('category1').value;
+            const category2 = document.getElementById('category2').value;
+            const date = document.getElementById('date').value;
+
+            const response = await fetch('/add_link', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ comment, link, category1, category2, date }),
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                loadLinks();
+            }
+
+            // Formular zurücksetzen
+            document.getElementById('comment').value = '';
+            document.getElementById('link').value = '';
+            document.getElementById('category1').value = '';
+            document.getElementById('category2').value = '';
+            document.getElementById('date').value = '';
+        }
+
+        // Funktion zum Laden der Links
+        async function loadLinks() {
+            const response = await fetch('/get_links');
+            const links = await response.json();
+
+            const tileContainer = document.getElementById('tileContainer');
+            tileContainer.innerHTML = '';
+
+            links.forEach(link => {
+                const newTile = document.createElement('div');
+                newTile.classList.add('tile');
+
+                newTile.innerHTML = `
+                    <h3>${link[1]}</h3>
+                    <p class="link"><a href="${link[2]}" target="_blank">${link[2]}</a></p>
+                    <p class="description">Kategorie 1: ${link[3]}, Kategorie 2: ${link[4]}</p>
+                    <p class="description">Datum: ${link[5]}</p>
+                    <button class="open-link" onclick="window.open('${link[2]}', '_blank')">Link öffnen</button>
+                    <button class="delete-button" onclick="deleteLink(${link[0]})">Löschen</button>
+                `;
+
+                tileContainer.appendChild(newTile);
+            });
+        }
+
+        // Funktion zum Löschen eines Links
+        async function deleteLink(id) {
+            const response = await fetch('/delete_link', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ id }),
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                loadLinks();
+            }
+        }
+
+        // Funktion zum Filtern der Links
+        function filterLinks() {
+            const searchComment = document.getElementById('searchComment').value.toLowerCase();
+            const filterCategory1 = document.getElementById('filterCategory1').value.toLowerCase();
+            const filterCategory2 = document.getElementById('filterCategory2').value.toLowerCase();
+
+            const tiles = document.querySelectorAll('.tile');
+
+            tiles.forEach(tile => {
+                const comment = tile.querySelector('h3').innerText.toLowerCase();
+                const category1 = tile.querySelector('.description').innerText.toLowerCase();
+                const category2 = tile.querySelector('.description').innerText.toLowerCase();
+
+                if (comment.includes(searchComment) &&
+                    (filterCategory1 === "" || category1.includes(filterCategory1)) &&
+                    (filterCategory2 === "" || category2.includes(filterCategory2))) {
+                    tile.style.display = 'block';
+                } else {
+                    tile.style.display = 'none';
+                }
+            });
+        }
+
+        // Funktion zum Löschen des Filters
+        function clearFilter() {
+            document.getElementById('searchComment').value = '';
+            document.getElementById('filterCategory1').value = '';
+            document.getElementById('filterCategory2').value = '';
+
+            const tiles = document.querySelectorAll('.tile');
+            tiles.forEach(tile => {
+                tile.style.display = 'block';
+            });
+        }
+
+        // Laden der Links beim Laden der Seite
+        window.onload = loadLinks;
+    </script>
+</body>
+</html>
